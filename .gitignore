@@ -1,6 +1,6 @@
 *
-!data_tracked/
-!data_tracked/*
+!tracked_data/
+!tracked_data/*
 !*.Rmd
 !*.py
 !*.sh

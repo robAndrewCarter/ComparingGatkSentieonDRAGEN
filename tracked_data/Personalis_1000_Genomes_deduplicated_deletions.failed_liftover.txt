@@ -1,0 +1,20 @@
+#Partially deleted in new
+chr7	72270263	72275842
+#Deleted in new
+chr9	136154304	136154433
+#Partially deleted in new
+chr12	11341899	11342212
+#Deleted in new
+chr14	106415142	106415231
+#Split in new
+chr14	106798247	106822961
+#Partially deleted in new
+chr17	35143424	35143742
+#Split in new
+chr22	18047361	18047718
+#Split in new
+chr22	18057751	18060457
+#Split in new
+chrX	45587560	45587866
+#Partially deleted in new
+chrX	149551137	149551472
