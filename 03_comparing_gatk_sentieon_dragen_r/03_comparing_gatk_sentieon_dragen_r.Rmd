@@ -1,0 +1,50 @@
+---
+title: "Comparing variant calling precision and sensitivity between three vendors"
+output: html_notebook
+---
+
+## Overview
+
+Here we compare the sensitivity and precision of variant detection using three different vendors: Sentieon, GATK, and DRAGEN.
+For each vendor, the same set of 17 samples (with the exception of Dragen - see below) was used for gVCF construction and joint-genotyping. The 17 samples included 16 samples from the lot 16-20 vantage run and a PCR-free bulk sample that has been subsampled to 450 million reads. Note that VUMC did not inlcude one of the samples in their joint-genotyping (4249-JW-43, so the sensitivity and precision for DRAGEN cells might be slightly underestimated) 
+
+```{r}
+
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(grid)
+  library(gridExtra)
+})
+```
+
+```{r}
+#Setup default themes
+default_theme <- theme_light() + theme(axis.text.x = element_text(angle = -90), plot.title = element_text(hjust = 0.5))
+```
+
+## Precision and Sensitivity of the three vendors
+
+We load the precision and sensitivity calculations for the three vendors
+```{r}
+rtg_summaries_df <- read.table("../tracked_data/rtg_summary_all_samples_minus_one_dragen.tsv", sep = "\t", header = TRUE) %>% dplyr::select(-X)
+```
+
+
+Next, plots of Precision and sensitivity are generated, emphasizing the comparisons between the same cells from different platforms
+```{r fig.width = 12, fig.height = 6}
+sensitivity_plot <- ggplot(rtg_summaries_df, aes(sample_name, Sensitivity, color = platform)) + geom_point() + default_theme + labs(x ="Sample Name", title = "Sensitivity of SNV detection by platform")
+precision_plot <- ggplot(rtg_summaries_df, aes(sample_name, Precision, color = platform)) + geom_point() + default_theme + labs(x ="Sample Name", title = "Precision of SNV detection by platform")
+grid.arrange(sensitivity_plot, precision_plot, ncol = 2)
+```
+
+## SNV Bulk sample variant counts 
+
+Next, we plot the number of SNVs detected by each method in the bulk sample
+
+```{r}
+snp_count_plot <- ggplot(rtg_summaries_df, aes(sample_name, True.pos.baseline, color = platform)) + geom_point() + default_theme + labs(x ="Sample Name", title = "SNV count in bulk sample by platform")
+```
+
+## Summary
+
+Although final confirmation by analyzing the full 17-cell dataset from VUMC using DRAGEN is required, DRAGEN has the lowest specificity for all cells and the lowest sensitivity for the majority of cells where the three platforms have been assessed. The rankings between GATK and Sentieon are inverted for sensitivity and precision, with Sentieon being more precise and GATK being more sensitive. Since there is a sensitivity-precision tradeoff, either the sensitivity or precision for either vendor can be increased, but with a descrease in the other metric. Thus, Sentieon's sensitivity could be potentially increased to a level similar to GATK's. This would result in a decrease in Sentieon's precision towards that of GATK. This would require further examination, but based on the significantly reduced runtime, complexity, and associated costs, and assuming that the final DRAGEN metrics don't significantlyincrease its performance, Sentieon appears to be the best option for routine rapid vcf generation, both for Trailblazer and for internal R&D.

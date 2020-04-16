@@ -1,7 +1,10 @@
 *
+!*/
+.ipynb_checkpoints/
 !tracked_data/
 !tracked_data/*
 !*.Rmd
+!*.html
 !*.py
 !*.sh
 !.gitignore

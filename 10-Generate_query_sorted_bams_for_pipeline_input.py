@@ -584,20 +584,26 @@ dragen_joined_samplenames = ",".join(dragen_samplenames)
 
 # ### Gather RTG summary files
 
-summary_files = ls 
+summary_files = !find scratch/*_{dragen,sentieon,gatk} -name summary.txt | grep -v _vs_NA12878_Bulk2-n16_gatk
+summary_files
+
+
 
 df_list = []
 for _summary_file in summary_files:
-    sample_name = re.sub("^.+vs_(.+)-idt.+", "\\1", _summary_file.split("/")[1])
-    temp_df = pd.read_csv(_summary_file, skiprows=3, sep = "[\t ]+", header = None, names=["Threshold","True-pos-baseline","True-pos-call","False-pos","False-neg","Precision","Sensitivity","F-measure"])
+    comparison_dir_name = _summary_file.split("/")[1]
+    sample_name = re.sub("^.+vs_(.+)-n16.*", "\\1", comparison_dir_name)
+    sample_name = re.sub("_combined", "", sample_name)
+    platform = re.sub("^.+-n16.", "", comparison_dir_name)
+    temp_df = pd.read_csv(_summary_file, skiprows=2, sep = "[\t ]+", header = None, names=["Threshold","True-pos-baseline","True-pos-call","False-pos","False-neg","Precision","Sensitivity","F-measure"]).head(1)
     temp_df['sample_name'] = sample_name
-    if re.search("n6e7", _summary_file):
-        temp_df['subsample_level'] = 60000000
-    elif re.search("ne7", _summary_file):
-        temp_df['subsample_level'] = 20000000
-    else:
-        temp_df['subsample_level'] = 40000000
+    temp_df['platform'] = platform
     df_list.append(temp_df)
 rtg_summary_df = pd.concat(df_list)
+rtg_summary_df
 
-rtg_summary_df.to_csv("data_tracked/rtg_summary_all_subsamples.tsv", sep = "\t")
+rtg_summary_df.to_csv("tracked_data/rtg_summary_all_samples_minus_one_dragen.tsv", sep = "\t")
+
+rtg_summary_df
+
+
