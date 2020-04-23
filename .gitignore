@@ -4,6 +4,7 @@
 !tracked_data/
 !tracked_data/*
 !*.Rmd
+!*.ipynb
 !*.html
 !*.py
 !*.sh
