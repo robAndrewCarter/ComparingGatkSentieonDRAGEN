@@ -46,16 +46,10 @@ storage_client = storage.Client('bioskryb')
 # Here we perform joint genotyping on 16 samples from lots 16 - 20. The samples are not subsampled, but are all similar in file size.
 # We first run the GATK gVCFs through GATK's haplotypeCaller, but including the subsampled Bulk2 reference sequence.
 
-non_subsampled_sample_names = list(as_and_wgs_and_dups_metrics_df[as_and_wgs_and_dups_metrics_df["sample_prop"]< 1.06].sort_values('sample_prop', ascending = False).head(16).loc[:, ['sample_name', "sample_prop"]].head(24)['sample_name'])
-
-all_gvcf_files = !gsutil ls gs://bioskryb-cromwell-outputs-jd7fh2/VUMC_Nova183_H37TLDSXY_DUAL_PTA_4249-JW-49-64/**.g.vcf.gz
-all_gvcf_files[:2]
-
-
 gvcf_filenames = !gsutil ls gs://bioskryb-vumc-data/Full_PTA_exome_deepdive_with_other_techs/data/01-gatk_cromwell_output/**.g.vcf.gz
 gvcf_filenames_n16 = [_file for _file in gvcf_filenames if re.sub(".g.vcf.gz", "", os.path.basename(_file)) in non_subsampled_sample_names] + ["gs://bioskryb-cromwell-outputs-jd7fh2/temp-folder-for-deletion/NA12878_Bulk2_merged_n450x10e6.g.vcf.gz"]
 
-df_list = [[re.sub("(.g.vcf.gz)|(_merged.+)", "", os.path.basename(_blobname)), _blobname] for _blobname in gvcf_filenames_n16_noref]
+df_list = [[re.sub("(.g.vcf.gz)|(_merged.+)", "", os.path.basename(_blobname)), _blobname] for _blobname in gvcf_filenames_n16]
 pd.DataFrame(df_list).to_csv('tracked_data/gatk_n16_nonsubsampled_sample_map.tsv', sep = "\t", header = False, index= False)
 # !gsutil cp tracked_data/gatk_n16_nonsubsampled_sample_map.tsv gs://bioskryb-work-d8f6s9/ComparingGatkSentieonDRAGEN/data/04-nosubsampling_n16_joint_genotyping/
 
@@ -99,62 +93,6 @@ jj_resp.content
 
 gvcf_filenames_n16
 
-# ## GATK - no Ref
-
-# Here we perform joint genotyping on 16 samples from lots 16 - 20. The samples are not subsampled, but are all similar in file size.
-# We exclude the bulk data from this run
-
-non_subsampled_sample_names = ["4249-JW-10","4249-JW-14","4249-JW-16","4249-JW-17","4249-JW-18","4249-JW-19","4249-JW-23","4249-JW-25","4249-JW-27","4249-JW-30","4249-JW-32","4249-JW-36","4249-JW-38","4249-JW-40","4249-JW-42","4249-JW-43"]
-
-all_gvcf_files = !gsutil ls gs://bioskryb-cromwell-outputs-jd7fh2/VUMC_Nova183_H37TLDSXY_DUAL_PTA_4249-JW-49-64/**.g.vcf.gz
-all_gvcf_files[:2]
-
-
-gvcf_filenames = !gsutil ls gs://bioskryb-vumc-data/Full_PTA_exome_deepdive_with_other_techs/data/01-gatk_cromwell_output/**.g.vcf.gz
-gvcf_filenames_n16_no_ref = [_file for _file in gvcf_filenames if re.sub(".g.vcf.gz", "", os.path.basename(_file)) in non_subsampled_sample_names] 
-
-df_list = [[re.sub("(.g.vcf.gz)|(_merged.+)", "", os.path.basename(_blobname)), _blobname] for _blobname in gvcf_filenames_n16_no_ref]
-pd.DataFrame(df_list).to_csv('tracked_data/gatk_n16_no_ref_nonsubsampled_sample_map.tsv', sep = "\t", header = False, index= False)
-# !gsutil cp tracked_data/gatk_n16_no_ref_nonsubsampled_sample_map.tsv gs://bioskryb-work-d8f6s9/ComparingGatkSentieonDRAGEN/data/04-nosubsampling_n16_joint_genotyping/
-
-jj_input_json = cromwell_functions.download_and_read_inputs_json("gs://bioskryb_dev_wdl_and_inputs/gatk-workflows/gatk4-germline-snps-indels/2.0.0/JointGenotyping.hg38.wgs.inputs.json", storage_client)
-
-jj_input_json['JointGenotyping.sample_name_map'] = "gs://bioskryb-work-d8f6s9/ComparingGatkSentieonDRAGEN/data/04-nosubsampling_n16_joint_genotyping/gatk_n16_no_ref_nonsubsampled_sample_map.tsv"
-jj_input_json['JointGenotyping.callset_name'] = "nosubsampling_n16_no_ref_gatk_joint_genotyping_gatk"
-
-# +
-project_name = "ComparingGatkSentieonDRAGEN"
-final_output_bucket = "gs://bioskryb-work-d8f6s9"
-cromwell_runs_bucket = "gs://bioskryb-dev-cromwell-runs-8dhf5d"
-
-    
-output_base_location = "{}/{}/{}".format(final_output_bucket, project_name, "data/04-nosubsampling_n16_no_ref_joint_genotyping")
-jj_options_dict = {
-        "read_from_cache": False,
-        "default_runtime_attributes": {
-                "zones": "us-central1-a us-central1-b us-central1-c us-central1-f"
-        },
-        "final_workflow_outputs_dir": output_base_location,
-        "use_relative_output_paths": True,
-        "final_call_logs_dir": "{}/call_logs".format(output_base_location),
-        "jes_gcs_root": cromwell_runs_bucket,
-        "google_labels": {
-                "pipeline-name": "gatk4-germline-snps-indels",
-                "project-name": "comparing-gatk-sentieon-dragen"
-        }
-}
-# -
-
-input_iobytes = io.BytesIO(json.dumps(jj_input_json).encode())
-options_iobytes = io.BytesIO(json.dumps(jj_options_dict).encode())
-jj_resp = cwt.submit(auth_obj, 
-       wdl_file = cromwell_functions.get_wdl_iobytes("gs://bioskryb_dev_wdl_and_inputs/gatk-workflows/gatk4-germline-snps-indels/2.0.0/JointGenotyping.wdl", storage_client), 
-       inputs_files = input_iobytes,
-       options_file = options_iobytes
-)
-
-jj_resp.content
-
 # ## Sentieon - gVCF generation
 
 # The same 16 samples from above (plus the reference) are joint genotyped using Sentieon
@@ -168,6 +106,8 @@ all_r1_fastqs = r1_fastq_files + r2_fastq_files
 all_r1_fastqs
 valid_fastq_r1_filenames_n16 = [_file for _file in all_r1_fastqs if re.sub("_S[01-9].*.fastq.gz", "", os.path.basename(_file)) in non_subsampled_sample_names] + ["gs://bioskryb-work-d8f6s9/ComparingGatkSentieonDRAGEN/data/NA12878_Bulk2_merged_n450x10e6_R1_001.fastq.gz"]
 valid_fastq_r1_filenames_n16 = sorted(valid_fastq_r1_filenames_n16)
+
+
 
 sample_to_fastq_dict = {}
 for _file in valid_fastq_r1_filenames_n16:
@@ -227,6 +167,7 @@ json_files
 
 # !ls tracked_data/*JW-32.n16.sentieoninput.json | parallel -j 16 --max-args 1 "tracked_data/time_and_run_sentieon.sh {}"
 
+# + jupyter={"source_hidden": true}
 options_dict = {
         "default_runtime_attributes": {
                 "zones": "us-central1-a us-central1-b us-central1-c us-central1-f",
@@ -522,9 +463,9 @@ apply_varcal_dcr.submit_jobs()
 
 apply_varcal_dcr.get_status()
 
-# ## Copy vcfs into scratch for analysis by R
+# ## Measuring precision and sensitivity 
 
-# The following was performed to acuire the vcf files for Sentieon and gatk samples:
+# The following was performed to acquire the vcf files for Sentieon and gatk samples:
 
 # `rcarter@bioskryb-dt:scratch$ gsutil cp gs://bioskryb-work-d8f6s9/ComparingGatkSentieonDRAGEN/data/04-nosubsampling_n16_joint_genotyping/sentieon/applyvarcal/95f90949-445b-4493-b80e-ddaf09353cda/call-GenericTask/**.vcf.gz* .`
 #
@@ -541,8 +482,14 @@ apply_varcal_dcr.get_status()
 # `for i in nosubsampling_n16_sentieon_joint_genotyping_sentieon.indel.*; do NEW_NAME=$(echo $i | sed 's/.indel//'); mv $i $NEW_NAME; done`
 
 # %%writefile tracked_data/run_rtg.sh
+# baseline vcf
+# baseline sample_name
+# comparison vcf
+# joined comparison vcfs
+#filder suffix
+# extra options
 #!/usr/bin/env bash
-# echo $2 | sed 's/,/\n/g' | parallel --max-args=1 --jobs 8 /home/rcarter/rtg-tools/bin/rtg-tools-3.10.1-4d58eadb/rtg RTG_MEM=6G vcfeval -b $1 -c $1 --sample=NA12878_Bulk2,{} -o scratch/NA12878_Bulk2_vs_{}-${3} -t /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/SDF/ --squash-ploidy
+# echo $4 | sed 's/,/\n/g' | parallel --max-args=1 --jobs 8 /home/rcarter/rtg-tools/bin/rtg-tools-3.10.1-4d58eadb/rtg RTG_MEM=6G vcfeval -b $1 -c $3 --sample=${2},{} -o scratch/${2}_vs_{}-${5} -e /home/rcarter/Homo_sapiens_assembly38_n25chr.bed -t /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/SDF/  --squash-ploidy $6
 
 # !chmod 755 tracked_data/run_rtg.sh
 
@@ -550,42 +497,48 @@ apply_varcal_dcr.get_status()
 
 # #### GATK
 
-gatk_snps_vcf = vcf.Reader(open('scratch/nosubsampling_n16_gatk_joint_genotyping_gatk.vcf.gz', 'rb'))
+gatk_snps_vcf = vcf.Reader(open('scratch/nosubsampling_n16_gatk_joint_genotyping_gatk.snps_only.vcf.gz', 'rb'))
 gatk_samplenames = gatk_snps_vcf.samples
 gatk_samplenames
 
+# + jupyter={"outputs_hidden": true}
 gatk_joined_samplenames = ",".join(gatk_samplenames)
-# !tracked_data/run_rtg.sh scratch/nosubsampling_n16_gatk_joint_genotyping_gatk.snps_only.vcf.gz $gatk_joined_samplenames n16_gatk
+# !tracked_data/run_rtg.sh scratch/nosubsampling_n16_gatk_joint_genotyping_gatk.snps_only.vcf.gz NA12878_Bulk2 scratch/nosubsampling_n16_gatk_joint_genotyping_gatk.snps_only.vcf.gz $gatk_joined_samplenames  n16_gatk "--vcf-score-field=INFO.AS_VQSLOD"
+# -
+
+# !tracked_data/run_rtg.sh scratch/nosubsampling_n16_gatk_joint_genotyping_gatk.snps_only.vcf.gz NA12878_Bulk2 scratch/nosubsampling_n16_gatk_joint_genotyping_gatk.snps_only.vcf.gz 4249-JW-10,4249-JW-27 all_variants_n16_gatk "--vcf-score-field=INFO.AS_VQSLOD --all-records"
 
 # #### Sentieon
 
 sentieon_snps_vcf = vcf.Reader(open('scratch/nosubsampling_n16_sentieon_joint_genotyping_sentieon.varcal.final.snps_only.vcf.gz', 'rb'))
-sentieon_samplenames = [_sample_name for _sample_name in sentieon_snps_vcf.samples if _sample_name != 'NA12878_Bulk2']
+sentieon_samplenames = [_sample_name for _sample_name in sentieon_snps_vcf.samples]
 sentieon_samplenames
 
 sentieon_joined_samplenames = ",".join(sentieon_samplenames)
-# !tracked_data/run_rtg.sh scratch/nosubsampling_n16_sentieon_joint_genotyping_sentieon.varcal.final.snps_only.vcf.gz $sentieon_joined_samplenames n16_sentieon
+# !tracked_data/run_rtg.sh scratch/nosubsampling_n16_sentieon_joint_genotyping_sentieon.varcal.final.snps_only.vcf.gz NA12878_Bulk2 scratch/nosubsampling_n16_sentieon_joint_genotyping_sentieon.varcal.final.snps_only.vcf.gz $sentieon_joined_samplenames n16_sentieon "--vcf-score-field=INFO.VQSLOD"
+
+# !tracked_data/run_rtg.sh scratch/nosubsampling_n16_sentieon_joint_genotyping_sentieon.varcal.final.snps_only.vcf.gz NA12878_Bulk2 scratch/nosubsampling_n16_sentieon_joint_genotyping_sentieon.varcal.final.snps_only.vcf.gz 4249-JW-10,4249-JW-27 all_variants_n16_sentieon "--vcf-score-field=INFO.VQSLOD --all-records" 
 
 # #### DRAGEN
 
-# %%writefile tracked_data/run_dragen_rtg.sh
-#!/usr/bin/env bash
-# echo $2 | sed 's/,/\n/g' | parallel --max-args=1 --jobs 8 /home/rcarter/rtg-tools/bin/rtg-tools-3.10.1-4d58eadb/rtg RTG_MEM=6G vcfeval -b $1 -c $1 --sample=NA12878-Bulk2-merged-n450x10e6,{} -o scratch/NA12878-Bulk2-merged-n450x10e6_vs_{}-${3} -t /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/SDF/ --squash-ploidy
-
-# !chmod 755 tracked_data/run_dragen_rtg.sh
-
 dragen_snps_vcf = vcf.Reader(open('scratch/dragen-joint.hard-filtered.snps_only.vcf.gz', 'rb'))
 dragen_samplenames = dragen_snps_vcf.samples
-dragen_samplenames = [_sample_name for _sample_name in dragen_snps_vcf.samples if _sample_name != 'NA12878-Bulk2-merged-n450x10e6']
+#dragen_samplenames = [_sample_name for _sample_name in dragen_snps_vcf.samples if _sample_name != 'NA12878-Bulk2-merged-n450x10e6']
 dragen_samplenames
 
+# + jupyter={"outputs_hidden": true}
 dragen_joined_samplenames = ",".join(dragen_samplenames)
-# !tracked_data/run_dragen_rtg.sh scratch/dragen-joint.hard-filtered.snps_only.vcf.gz $dragen_joined_samplenames n16_dragen
+# !tracked_data/run_rtg.sh scratch/dragen-joint.hard-filtered.snps_only.vcf.gz NA12878-Bulk2-merged-n450x10e6 scratch/dragen-joint.hard-filtered.snps_only.vcf.gz $dragen_joined_samplenames n16_dragen  "--vcf-score-field=GQ"
+# -
+
+# !tracked_data/run_rtg.sh scratch/dragen-joint.hard-filtered.snps_only.vcf.gz NA12878-Bulk2-merged-n450x10e6 scratch/dragen-joint.hard-filtered.snps_only.vcf.gz 4249-JW-10_combined,4249-JW-27_combined all_variants_n16_dragen  "--vcf-score-field=GQ  --all-records"
 
 # ### Gather RTG summary files
 
-summary_files = !find scratch/*_{dragen,sentieon,gatk} -name summary.txt | grep -v _vs_NA12878_Bulk2-n16_gatk
+# + jupyter={"outputs_hidden": true}
+summary_files = !find scratch/*_{dragen,sentieon,gatk} -name summary.txt | grep -v giab | grep -v all_variants
 summary_files
+# -
 
 
 
@@ -594,6 +547,7 @@ for _summary_file in summary_files:
     comparison_dir_name = _summary_file.split("/")[1]
     sample_name = re.sub("^.+vs_(.+)-n16.*", "\\1", comparison_dir_name)
     sample_name = re.sub("_combined", "", sample_name)
+    sample_name = re.sub("NA12878-Bulk2-merged-n450x10e6", "NA12878_Bulk2", sample_name)
     platform = re.sub("^.+-n16.", "", comparison_dir_name)
     temp_df = pd.read_csv(_summary_file, skiprows=2, sep = "[\t ]+", header = None, names=["Threshold","True-pos-baseline","True-pos-call","False-pos","False-neg","Precision","Sensitivity","F-measure"]).head(1)
     temp_df['sample_name'] = sample_name
@@ -602,8 +556,66 @@ for _summary_file in summary_files:
 rtg_summary_df = pd.concat(df_list)
 rtg_summary_df
 
-rtg_summary_df.to_csv("tracked_data/rtg_summary_all_samples_minus_one_dragen.tsv", sep = "\t")
+rtg_summary_df.to_csv("tracked_data/rtg_summary_all_samples.tsv", sep = "\t")
 
 rtg_summary_df
+
+# ### Comparing all samples to GIAB
+
+# We compare all samples in each VCF to the GIAB sample. This gives us an objectibve means for comparison between vendors
+
+# #### GATK
+
+# + jupyter={"outputs_hidden": true}
+# !tracked_data/run_rtg.sh /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz HG001 scratch/nosubsampling_n16_gatk_joint_genotyping_gatk.snps_only.vcf.gz $gatk_joined_samplenames  giab_vs_n16_gatk "--vcf-score-field=INFO.AS_VQSLOD"
+# -
+
+# !tracked_data/run_rtg.sh /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz HG001 scratch/nosubsampling_n16_gatk_joint_genotyping_gatk.snps_only.vcf.gz 4249-JW-10,4249-JW-27 all_variants_giab_vs_n16_gatk "--vcf-score-field=INFO.AS_VQSLOD --all-records"
+
+# #### Sentieon
+
+# + jupyter={"outputs_hidden": true}
+# !tracked_data/run_rtg.sh /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz HG001 scratch/nosubsampling_n16_sentieon_joint_genotyping_sentieon.varcal.final.snps_only.vcf.gz $sentieon_joined_samplenames giab_vs_n16_sentieon "--vcf-score-field=INFO.VQSLOD"
+
+# + jupyter={"outputs_hidden": true}
+# !tracked_data/run_rtg.sh /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz HG001 scratch/nosubsampling_n16_sentieon_joint_genotyping_sentieon.varcal.final.snps_only.vcf.gz 4249-JW-10,4249-JW-27 all_variants_giab_vs_n16_sentieon "--vcf-score-field=INFO.VQSLOD --all-records" 
+# -
+
+# #### DRAGEN
+
+# + jupyter={"outputs_hidden": true}
+# !tracked_data/run_rtg.sh /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz HG001 scratch/dragen-joint.hard-filtered.snps_only.vcf.gz $dragen_joined_samplenames giab_vs_n16_dragen  "--vcf-score-field=GQ"
+
+# + jupyter={"outputs_hidden": true}
+# !tracked_data/run_rtg.sh /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz HG001 scratch/dragen-joint.hard-filtered.snps_only.vcf.gz 4249-JW-10_combined,4249-JW-27_combined all_variants_giab_vs_n16_dragen  "--vcf-score-field=GQ --all-records"
+# #!tracked_data/run_rtg.sh scratch/dragen-joint.hard-filtered.snps_only.vcf.gz NA12878-Bulk2-merged-n450x10e6 scratch/dragen-joint.hard-filtered.snps_only.vcf.gz 4249-JW-10_combined,4249-JW-27_combined all_variants_n16_dragen  "--vcf-score-field=GQ  --all-records"
+# -
+
+# ### Gather GIAB-comparison RTG summary files
+
+summary_giab_files = !find scratch/HG001*-giab_vs_n16_{dragen,sentieon,gatk} -name summary.txt
+summary_giab_files
+
+# + jupyter={"outputs_hidden": true}
+df_list = []
+for _summary_file in summary_giab_files:
+    comparison_dir_name = _summary_file.split("/")[1]
+    sample_name = re.sub("HG001_vs_(.+)-giab_.+", "\\1", comparison_dir_name)
+    sample_name = re.sub("_combined", "", sample_name)
+    sample_name = re.sub("NA12878-Bulk2-merged-n450x10e6", "NA12878_Bulk2", sample_name)
+    platform = re.sub("^.+_", "", comparison_dir_name)
+    temp_df = pd.read_csv(_summary_file, skiprows=2, sep = "[\t ]+", header = None, names=["Threshold","True-pos-baseline","True-pos-call","False-pos","False-neg","Precision","Sensitivity","F-measure"]).tail(1)
+    temp_df['sample_name'] = sample_name
+    temp_df['platform'] = platform
+    df_list.append(temp_df)
+rtg_giab_summary_df = pd.concat(df_list)
+rtg_giab_summary_df
+# -
+
+rtg_giab_summary_df.to_csv("tracked_data/rtg_summary_giab_vs_all_samples.tsv", sep = "\t")
+
+# + jupyter={"outputs_hidden": true}
+rtg_giab_summary_df
+# -
 
 

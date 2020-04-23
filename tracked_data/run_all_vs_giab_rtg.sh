@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+echo $2 | sed 's/,/\n/g' | parallel --max-args=1 --jobs 8 /home/rcarter/rtg-tools/bin/rtg-tools-3.10.1-4d58eadb/rtg RTG_MEM=4G vcfeval -b /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/HG001_GRCh38_GIAB_highconf_CG-IllFB-IllGATKHC-Ion-10X-SOLID_CHROM1-X_v.3.3.2_highconf_PGandRTGphasetransfer.vcf.gz -c $1 --sample=HG001,{} -e /home/rcarter/Homo_sapiens_assembly38_n25chr.bed -o scratch/HG001_vs_{}-${3} -t /home/rcarter/R_bioskryb_na12878_analysis/NA12878_comparison/SDF/ --squash-ploidy
